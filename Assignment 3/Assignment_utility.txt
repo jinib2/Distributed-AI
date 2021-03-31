@@ -1,0 +1,360 @@
+/**
+* Name: Util
+* Based on the internal empty template. 
+* Author: Admin
+* Tags: 
+*/
+
+
+model Util
+
+/* Insert your model definition here */
+
+global
+{
+	int no_guests <- 25;
+	int no_stages <- 4;
+	list<point> stages;
+	list<string> stage_name;
+	
+	init
+	{
+		create Entrance number: 1
+		{
+			location <- {1,85};
+		}
+		create Stage number: 1
+		{
+			location <- {10,50};
+			add location to: stages;
+			add name to: stage_name;
+		}
+		create Stage number: 1
+		{
+			location <- {50,60};
+			add location to: stages;
+			add name to: stage_name;
+		}
+		create Stage number: 1
+		{
+			location <- {10,25};
+			add location to: stages;
+			add name to: stage_name;
+		}
+		create Stage number: 1
+		{
+			location <- {80,10};
+			add location to: stages;
+			add name to: stage_name;
+		}
+		create Leader number: 1
+		{
+			location <- {25,35};
+		}
+		create Festival_guest number: no_guests
+		{
+			location <- {rnd(80), rnd(90)};
+		}
+	}
+}
+
+species Entrance{
+	aspect default{
+		draw box (2,15,2) at: location color: #orange lighted: bool(1);
+	}
+}
+
+species Stage skills: [fipa] {
+	rgb Color <- #cyan;
+	aspect default{
+		draw box(5,5,5) at: location color: Color lighted: bool(1);
+	}
+	
+	bool start <- true;
+	
+	float visuals <- rnd (1.0,5.0);
+	float music <- rnd (1.0,5.0);
+	float lights <- rnd (1.0,5.0);
+	float models <- rnd (1.0,5.0);
+	float popularity <- rnd (1.0,5.0);
+	
+	int i <- 0;
+	bool new_act_time <- false;
+	
+	reflex change_act {
+		if  new_act_time = true {
+			write "Time for a new act. Get ready!";
+		    float visuals <- rnd (1.0,10.0);
+	        float music <- rnd (1.0,5.0);
+	        float lights <- rnd (1.0,10.0);
+	        float models <- rnd (1.0,10.0);
+	        float popularity <- rnd (1.0,10.0);
+	        do start_conversation with: [ to::list(Festival_guest), protocol:: 'no-protocol', performative :: 'cfp', contents::[self.name, visuals, music, lights, models, popularity]];
+	        new_act_time <- false;
+		}
+		
+		else if new_act_time = false{
+			if i <= 50
+			{
+				i <- i+1;
+			}
+				
+			else {
+				new_act_time <- true;
+				i <- 0;
+			}
+		}
+	}
+	
+	reflex sendparameters when: (!empty(cfps)) 
+	{
+		loop p over: cfps
+		{
+		if p.contents = ["getparameters"]
+			{
+			do cfp with:[message:: p, contents::[self.name, visuals, music, lights, models, popularity]];				
+			}
+		}			
+	}	
+}
+
+species Leader skills: [fipa] {
+	float tot_utilities <- 0.0;
+	float tot_new_utilities <- 0.0;
+	list<int> targets <- [];
+	
+	aspect default
+	{
+		draw cone3D(1.3,2.3) at: location color: #white ;
+    	draw sphere(0.7) at: location + {0, 0, 2} color: #white ; 
+	}
+	
+	reflex intendedgoals when: (!empty(informs))
+	{
+		//write "Currently in intended goals";
+		list intendedgoals <- informs;
+		
+		if length(intendedgoals) = length(Festival_guest)
+		{
+			//write "Currently in intended goals length if condition ";
+			list guestsperstage <-[];
+			list crowdlevel <-[];
+			
+			loop a over: intendedgoals
+				{
+					list<unknown> g <- a.contents;
+					tot_new_utilities <- tot_new_utilities + float(g[2]);									
+				}
+			
+			if tot_new_utilities > tot_utilities
+			{
+				//write "Currently in intended goals tot-new-utilities length if condition ";
+				tot_utilities <- tot_new_utilities;
+				tot_new_utilities <- 0.0;
+				targets <- [];
+				
+				loop a over: intendedgoals
+				{
+					list<unknown> c <- a.contents;
+					add int(c[0]) to: targets;									
+				}
+				
+				
+				loop a from: 0 to: (length(Stage)-1)
+				{
+					add 0 to: guestsperstage;	
+					add 0 to: crowdlevel;	
+				}
+
+				loop a over: intendedgoals
+					{
+						list<unknown> e <- a.contents;
+						//write "the contents of intendedgoals at index 0 are " +e[0];
+						int index <- int(e[0]);
+						//write "contents of guestsperstage at the given index is " +guestsperstage[index];
+						int b <- guestsperstage[index];
+						list<unknown> temp <- a.contents;
+						guestsperstage[temp[0]] <- b + 1;
+						
+						//int temp1 <- temp[0];
+						//write "contents of guestsperstage at the given index is " +guestsperstage[temp1];
+					}
+				loop a from: 0 to: length(guestsperstage) - 1
+					{
+						//write "contents of guestsperstage at the given index a is " +guestsperstage[a];
+						if int(guestsperstage[a]) >= no_guests/5
+						{
+							crowdlevel[a] <- 1;
+							//write "for stage" + a + " the number of guests is " + guestsperstage[a] + " and crowd level is " + crowdlevel[a]; 
+						}
+					}			
+				do start_conversation with: [ to::list(Festival_guest), protocol:: 'no-protocol', performative :: 'inform', contents::[crowdlevel]];
+					
+			}
+			else
+			{
+				write "The utility is not optimized. Move to the goal from the last solution!";
+				write targets;
+				do start_conversation with: [ to::list(Festival_guest), protocol:: 'no-protocol', performative :: 'request', contents::targets];
+				tot_utilities <- 0.0;
+				tot_new_utilities <- 0.0;
+				targets <- [];
+				}
+			}
+		}
+	}
+
+
+species Festival_guest skills: [fipa, moving] {
+	aspect default {
+		draw triangle(1) color: #red lighted: bool(1);
+	}
+	
+	point stage_preferred;
+	float preferred_visuals <- rnd (1.0,10.0);
+	float preferred_music <- rnd (1.0,6.0);
+	float preferred_lights <- rnd (1.0,10.0);
+	float preferred_models <- rnd (1.0,5.0);
+	float preferred_popularity <- rnd (1.0,10.0);
+	float preferred_crowd <- rnd (1.0,8.0);
+	bool start_conversation <- true;
+	
+	list<float> utilities;
+	
+	reflex ask_for_parameters when: start_conversation = true
+	{
+	    do start_conversation with: [ to :: list(Stage), protocol :: 'no-protocol', performative :: 'cfp', contents :: ["getparameters"] ];	
+	    start_conversation <- false;
+	}
+	
+	reflex getparameters when: (!empty(cfps))
+	{
+		list<string> names <-[];
+		list<float> visuals <-[];
+		list<float> music <- [];
+		list<float> lights <- [];
+		list<float> models <- [];
+		list<float> popularity <- [];
+		list<float> utilities <- []; 
+		list getparam <- cfps;
+		
+		point stage_preferred <- nil;
+		
+		if length(getparam) = length(stages)
+		{
+			loop a over: getparam
+			{
+				list<unknown> c <- a.contents;
+			    add (string(c[0])) to: names;
+				add (float(c[1])) to: visuals;
+				add (float(c[2])) to: music;
+				add (float(c[3])) to: lights;
+				add (float(c[4])) to: models;
+				add (float(c[5])) to: popularity;
+			}
+			
+			loop u from: 0 to: (length(getparam) - 1)
+			{
+				float utility <- preferred_visuals * visuals[u] + preferred_music * music[u] + preferred_lights * lights[u] + preferred_models * models[u] + preferred_popularity * popularity[u];
+				add utility to: utilities;
+				write "Utility for " + self.name + " for " + stage_name[u] + ": " + utility;
+			}
+			int target <- utilities index_of(max(utilities));
+			float max_utility <- utilities[target];
+			do start_conversation with: [to :: list(Leader), protocol:: "no-protocol", performative :: "inform", contents :: [target, self.name, max_utility]];
+		    write "Maximum utility for " + self.name + " is at " + stage_name[target] + ": " + max_utility;
+		    
+		    if preferred_crowd < 5 {
+			write self.name + ": I don't like crowd!";
+			}
+			else {
+			write self.name + ": I like the crowd!";
+			}
+			
+			loop n over: getparam
+			{
+				do end_conversation with:[message:: n, contents::["The favorable places of all guests in a list"]];	
+			}
+		}
+	}
+	
+	reflex utility_with_crowd when: (!empty(informs))
+	{
+		list<unknown> cs <- informs[0].contents;
+		list crowd_mass <- cs[0];
+		
+		if preferred_crowd < 0.5
+		{
+			loop b from: 0 to: (length(crowd_mass) - 1)
+			{
+				if string(crowd_mass[b]) as_int 10 = 1
+				{
+					crowd_mass[b] <- 0;
+				}
+				else {
+					crowd_mass[b] <- 1;
+				}
+			}
+			
+			list new_utilities <- [];
+			
+			loop x from: 0 to: (length(utilities) - 1)
+			{
+				
+			    if (preferred_crowd < 5) {
+				    add (float(utilities[x]) + float(crowd_mass[x]) * (1 - preferred_crowd - 0.5)) to: new_utilities;
+			    }
+			    else {
+				    add (float(utilities[x]) + float(crowd_mass[x]) * (preferred_crowd - 0.5)) to: new_utilities;	
+			    }
+			
+		    }
+		
+		int final_goal <- new_utilities index_of (max(new_utilities));
+		float maxutility_withcrowd <- new_utilities[final_goal]; 
+		do start_conversation with: [ to :: list(Leader), protocol :: 'no-protocol', performative :: 'inform', contents :: [final_goal, self.name, maxutility_withcrowd]];
+		//write "Maximum utility with crowd preference for " + self.name + " is at " + stage_name[final_goal] + ": " + maxutility_withcrowd;
+	    }
+	}	
+
+
+    reflex get_preferred_stage when: (!empty(requests))
+	{
+			list targets <- requests[0].contents;
+			//write targets;
+			
+			int a <- index_of(Festival_guest, self);
+			int f <- targets[a];
+			write  name + " will move to " + stage_name[f] + "based on the global utility." ;
+			
+			stage_preferred <- stages[f];
+	}
+
+
+
+	reflex goto_target when: stage_preferred != nil
+		{
+			if (location distance_to stage_preferred) < 10.0
+			{
+				do wander;
+				}
+				else
+				{
+					do goto target: stage_preferred speed: 6.0;
+					//write self.name + " is now at: " + stage_preferred;
+					}
+		}
+	}
+
+
+experiment main type: gui {
+	output {
+		display map type: opengl 
+		{
+			species Leader;
+			species Festival_guest;
+			species Stage;
+			species Entrance;
+		}
+	}
+}
