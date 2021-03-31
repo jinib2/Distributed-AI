@@ -1,0 +1,395 @@
+/**
+* Name: finalproject
+* Based on the internal empty template. 
+* Author: Fabio
+* Tags: 
+*/
+
+model finalproject
+
+global
+{
+	/* Locations */
+	point entrance_location <- {1,80};
+	point bar_location <- {20,40};
+	point stage_location <- {90,90};
+	
+	/* Numbers of agents to istantiate */
+	int n_party_persons <- 10;
+	int n_chill_persons <- 25;
+	int n_journalists <- 5;
+	int n_random_persons <- 10;
+	
+	/* Global booleans for events */
+	bool partyIsOpen <- false;
+	
+	/* Global variables / Lists */
+	list<string> DRINKS <- ["Water", "Juice", "Beer"];
+	
+	init{
+		create Entrance number: 1 { location <- entrance_location;}
+		create Bar number: 1 { location <- bar_location;}
+		create Stage number: 1 { location <- stage_location;}
+		create PartyPerson number: n_party_persons {}
+		create ChillPerson number: n_chill_persons {
+			drink <- DRINKS[rnd(0, length(DRINKS)-1)];
+		}
+		create Journalist number: n_journalists { location <- {50,50}; }
+		
+		create RandomPerson number: n_random_persons {
+			tolerance <- rnd(900,1100);
+		}
+	}
+}
+
+/*******************************************************************************************************/
+/*											SPECIES													   */
+/* ___________________________________________________________________________________________________ */
+
+species Entrance{
+	aspect default{
+		draw box (2,15,2) at: location color: #orange lighted: bool(1);
+	}
+}
+
+species Bar{
+	aspect default{
+		draw box (12,20,5) at: location color: #red lighted: bool(1);
+	}
+}
+
+/* Stage AGENT:
+ * 		where the events take place, it has a countdown to begin and 
+ * 		start the said event. After the countdown, a global boolean
+ * 		variable (partyIsOpen) is set to true so that the agents that
+ * 		want to party will go to the stage.
+ */
+species Stage{
+	aspect default{
+		draw circle(15) at: location color: #purple lighted: bool(1);
+	}
+	int timer <- 2000;
+	reflex countdown when: !partyIsOpen{
+		self.timer <- self.timer - 1;
+		if (self.timer < 0){
+			write " PARTY EVENT STARTED ! ";
+			partyIsOpen <- true;
+		}
+	}
+}
+
+/* PartyPerson AGENT:
+ * 		The most 'dynamic' visitor, it roams around and goes to the 
+ * 		bar more often than a ChillPerson, the corresponding threshold 
+ * 		is lower with respect to the one of a ChillPerson. This agent is 
+ *		always ready to party, therefore it just suffices that an event is
+ * 		open and it will go straight to the stage (if it's not at the bar).
+ * 		When at the bar or stage, this agent starts a communication (with 
+ *		FIPA protocol) with a ChillPerson agent and, depending on the outcome, 
+ *		it changes the overall mood (and therefore, behaviour) of the agent it 
+ * 		has spoken to. It also affects the mood of the RandomPerson agent 
+ * 		when the latter happens to meet one of them.
+ */
+species PartyPerson skills: [moving, fipa]{
+	aspect default{
+		draw sphere(1) at: location color: #red lighted: bool(1);
+	}
+
+	/* Variables */
+	string drink <- "Beer";
+	
+	/* Thresholds for behaviour. */
+	int thirsty_level <- rnd(300,400);
+	bool isThirsty <- false;
+	
+	/* With respect to ChillPerson, there's no threshold for partying,
+	 * the PartyPerson will go straight to Party when the event at the 
+	 * stage is open. 
+	 */
+	bool wantsParty <- true;
+	
+	/* Booleans for attending Bar or Stage/Concert. */
+	bool isAtBar <- false;
+	bool isAtStage <- false;
+	
+	reflex roaming when: !isThirsty {
+		do wander;
+		self.thirsty_level <- self.thirsty_level - 1;
+				
+		/* Thirsty: If threshold level is passed, put isThirsty to true. */
+		if ( self.thirsty_level < 0 ){
+			write self.name + ": Ok, I wanna drink";
+			self.isThirsty <- true;
+		}	
+	}
+	
+	/* Go to ... reflexes */
+	reflex goToBar when: isThirsty and !isAtBar{
+		do goto target: bar_location;
+		if (self.location = bar_location){
+			self.isAtBar <- true;
+		}
+	}
+	reflex goToStage when: wantsParty and !isAtStage and partyIsOpen{
+		do goto target: stage_location;
+		if (self.location = stage_location){
+			self.isAtStage <- true;
+		}
+	}
+	
+	/* Handle the behaviour of the agent when it is located at the bar or concert:
+	 * there are interactions with the PartyPerson agents ... ... ...   
+	 * ... TODO
+	 */
+	reflex atBar when: isAtBar{
+		/* TODO */
+		/* Simulate the queue... 
+		 * ...
+		 * ... what happens when a PartyPerson is met?
+		 */
+	}
+	
+	reflex atStage when: isAtStage{
+		/* TODO */
+	}
+}
+
+/* ChillPerson AGENT:
+ * 		A 'Normal' visitor, it roams around and goes to the bar or stage 
+ *		depending on two integers thresholds (thirsty/party_level). See 
+ * 		the comments below to graps the overall criteria for its behaviour.
+ *		After it reaches one location (bar or stage of a concert) there may be
+ * 		some interactions (communications) with PartyPerson agents: 
+ * 		communications that follow the FIPA protocol.
+ * 		A PartyPerson can offer a drink to a ChillPerson: depending on the 
+ * 		offer and some randomized parameters, the offer will be accepted or not;
+ * 		this negotation/communication can only be established between a PartyPerson
+ * 		agent and a ChillPerson agent. Depending on the outcome of the offer, the 
+ * 		overall mood and behaviour of the ChillPerson changes: it can get be more fed 
+ * 		up for staying at the festival, or get more excited and wants to drink 
+ * 		and participate more to a concert.
+ */
+species ChillPerson skills: [moving, fipa]{
+	aspect default{
+		draw sphere(1) at: location color: #blue lighted: bool(1);
+	}
+	
+	/* Variables */
+	string drink; // It is initialized randomly in the init statement in global
+	
+	/* Thresholds for behaviour. */
+	int thirsty_level <- rnd(600,800);
+	bool isThirsty <- false;
+	int party_level <- rnd(1400, 2500);
+	bool wantsParty <- false;
+	
+	/* Booleans for attending Bar or Stage/Concert or if it is currently interviewed by a Journalist. */
+	bool isAtBar <- false;
+	bool isAtStage <- false;
+	bool isInterviewed <- false;
+	
+	reflex roaming when: !isThirsty and !wantsParty{
+		do wander;
+		self.thirsty_level <- self.thirsty_level - 1;
+		self.party_level <- self.party_level - 1;
+				
+		/* Thirsty: If threshold level is passed, put isThirsty to true. */
+		if ( self.thirsty_level < 0 ){
+			write self.name + ": Ok, I wanna drink a ... " + self.drink;
+			self.isThirsty <- true;
+		}
+		
+		/* Party: if threshold is passed, with 20% probability the ChillPerson
+		 * 		  will decide whether or not to attend the concert/event, 
+		 *		  therefore the boolean wantsParty is set true. If not, the
+		 *		  threshlod is reset to lower value than the initial one, after
+		 *		  which it will decide again to attend the festival or not. */
+		if (self.party_level < 0){
+			float intention <- rnd(0.0, 1.0);
+			if (intention >= 0.8){
+				write self.name + ": Yeah, why no party?";
+				self.wantsParty <- true;
+			}
+			else {
+				write self.name + ": maybe the party another time...";
+				self.party_level <- rnd(400, 600);
+			}
+		}
+		
+	}
+	
+	/* Go to ... reflexes */
+	reflex goToBar when: isThirsty and !isAtBar{
+		do goto target: bar_location;
+		if (self.location = bar_location){
+			self.isAtBar <- true;
+		}
+	}
+	reflex goToStage when: wantsParty and !isAtStage and partyIsOpen{
+		do goto target: stage_location;
+		if (self.location = stage_location){
+			self.isAtStage <- true;
+		}
+	}
+	
+	/* Handle the behaviour of the agent when it is located at the bar or concert:
+	 * there are interactions with the PartyPerson agents ... ... ...   
+	 * ... TODO
+	 */
+	reflex atBar when: isAtBar{
+		/* TODO */
+		/* Simulate the queue... 
+		 * ...
+		 * ... what happens when a PartyPerson is met?
+		 *
+		 * NB: Make sure that at the end of communication, if the person drinks...
+		 * 		put isAtBar <- false;
+		 * 		put isThirsty <- false; 
+		 */
+	}
+	
+	reflex atStage when: isAtStage{
+		/* TODO */
+	}
+	
+	reflex isInterviewed when: isInterviewed{
+		/* TODO */
+		/* 
+		 * NB: Make sure that at the end of communication...
+		 * 		put isInterviewed <- false;
+		 */ 
+	}	
+}
+
+/* Journalist AGENT:
+ * 		This agent behaves in a way such that it will stop and interview ChillPerson
+ * 		agents that passes by them. When a timer runs out (currently at 1000 steps), 
+ * 		once a ChillPerson agent is close enough and not already interviewed, an 
+ * 		communication between the two agents (thorugh the FIPA protocol) will start.
+ * 		At the end, the ChillPerson agent that has been interviewed will be randomly 
+ * 		more bothered for the time wasted (it will be more fed up and wants to leave 
+ *		earlier the festival) or nothing changes.
+ */  
+species Journalist skills: [moving, fipa]{
+	aspect default{
+		draw triangle(2) at: location color: #green lighted: bool(1);
+	}
+
+	/* Variables */
+	int timer <- 1000;
+	bool canInterview <- false;
+	bool isInterviewing <- false;
+	
+	ChillPerson chillPersonToInterview;
+	
+	reflex waitForInterview when: !canInterview{
+		self.timer <- self.timer - 1 ;
+		if (self.timer < 0){
+			self.canInterview <- true;
+		}
+	}
+	
+	reflex canInterview when: canInterview and !isInterviewing{
+		do wander;
+		ask(ChillPerson){
+			bool cond1 <- distance_to(myself.location, self.location) < 3.0 ;
+			bool cond2 <- !self.isInterviewed;
+			if(cond1 and cond2){
+				write myself.name + "Waaait! What about an interview?";
+				myself.chillPersonToInterview <- self;
+				myself.isInterviewing <- true;
+				self.isInterviewed <- true;
+			}
+		}
+	}
+	
+	reflex isInterviewing when: isInterviewing{
+		/* TODO */
+		 /*
+		 *  NB: Make sure that at the end of interview with chillPersonInterviewed...
+		 * 		put isInterviewing <- false;
+		 * 		put canInterview <- false;
+		 * 		set timer <- 1000; 
+		 * 		set chillPersonInterviewed <- []; 
+		 */ 
+	}
+}
+
+
+/* RandomPerson AGENT:
+ * 		Not an enthusiastic visitor, it just roams around with no big purpose.
+ * 		This type of agent is just getting bored fast and if it meets a PartyPerson
+ *		it just get randomly more irritated or a little bit more excited;
+ *		but overall it's willing to stay at the festival decreases faster 
+ *		with respect to the other type of festival guests.
+ */
+species RandomPerson skills: [moving, fipa]{
+	aspect default{
+		draw sphere(1) at: location color: #grey lighted: bool(1);
+	}
+	
+	int tolerance;
+	bool isFedUp <- false;
+
+	reflex roaming when: !isFedUp{
+		do wander;
+		self.tolerance <- self.tolerance - 1;
+		
+		ask(PartyPerson){
+			if( distance_to(myself.location, self.location) < 2.0 ){
+				float impression <- rnd(0.0,1.0);
+				if (impression <= 0.5) {
+					write myself.name + ": boooooring!";
+					myself.tolerance <- myself.tolerance - rnd(9,11);
+				}
+				else {
+					write myself.name + ": hey cool!";
+					myself.tolerance <- myself.tolerance + 8;
+				}
+			}
+		}
+		
+		/* If it is fed up, he just wants to exit the festival. */
+		if ( self.tolerance < 0 ){
+			write self.name + ": Ok, I wanna go home! Bye!";
+			self.isFedUp <- true;
+		}
+	}
+	
+	/*  Go away from the festival when fed up. */
+	reflex goAway when: isFedUp{
+		do goto target: entrance_location;
+		if (self.location = entrance_location){
+			do die;
+		}
+	}
+}
+
+
+/*******************************************************************************************************/
+/*											EXPERIMENTS												   */
+/* ___________________________________________________________________________________________________ */
+
+experiment main type: gui{
+	output {
+		display map type: opengl 
+		{
+			species Entrance;
+			species Bar;
+			species Stage;
+			species PartyPerson;
+			species ChillPerson;
+			species Journalist;
+			species RandomPerson;
+		}
+		
+		display chart
+		{
+			chart "Agent displacements with and without memory"
+			{
+//				data "Distance for agents with memory" value: displacement_mem color: #pink;
+//				data "Distance for agents without memory" value: displacement color: #red;
+			}
+		}
+	}
+}

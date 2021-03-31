@@ -1,0 +1,469 @@
+/**
+* Name: Newfinalproj
+* Based on the internal empty template. 
+* Author: Admin
+* Tags: 
+*/
+
+
+model Newfinalproj
+
+/* Insert your model definition here */
+
+global
+{
+	/* Locations */
+	point entrance_location <- {1,80};
+	point bar_location <- {20,40};
+	point stage_location <- {90,90};
+	point shop_location <- {25,60};
+	list<point> areas_location <- [{20,40},{90,90},{25,60}];
+	
+	/* Numbers of agents to istantiate */
+	int n_festival_guests <- 50;
+	
+	/* Global booleans for events */
+	//bool partyIsOpen <- false;
+	
+	/* Global variables / Lists */
+	list<string> DRINKS <- ["Water", "Juice", "Beer"];
+	list<string> festival_guest_type <- ["Party", "Chill", "Shopaholic", "Criminal", "Introvert"];
+	list<string> locations <- ["Bar", "Stage", "Shop"];
+	
+	int person_type <- 0;
+	int global_happiness <- 0;
+	int global_sadness <- 0;
+	//bool randomization <- false;
+	
+	
+	//Number of each type of agent
+	int n_party <- 0;
+	int n_chill <- 0;
+	int n_shopaholic <- 0;
+	int n_criminal <- 0;
+	int n_introvert <- 0;
+	
+	
+	init{
+		create Entrance number: 1 { location <- entrance_location;}
+		create Bar number: 1 { location <- bar_location;}
+		create Stage number: 1 { location <- stage_location;}
+		create Shop number: 1 { location <- shop_location;}
+		string drink <- DRINKS[rnd(0, length(DRINKS)-1)];
+		
+		create Festival_guest number: n_festival_guests;
+	}
+}
+
+species Entrance{
+	aspect default{
+		draw box (2,15,2) at: location color: #orange lighted: bool(1);
+	}
+}
+
+species Bar{
+	aspect default{
+		draw box (2,5,5) at: location color: #red lighted: bool(1);
+	}
+}
+
+species Shop{
+	aspect default{
+		draw box (2,4,5) at: location color: #yellow lighted: bool(1);
+	}
+}
+
+
+species Stage{
+	aspect default{
+		draw box(5,5,2) at: location color: #purple lighted: bool(1);
+	}
+	/**int timer <- 300;
+	
+	reflex countdown when: !partyIsOpen{
+		self.timer <- self.timer - 1;
+		if (self.timer < 0){
+			write " PARTY EVENT STARTED ! ";
+			partyIsOpen <- true;
+		}
+	}**/
+}
+
+
+species Festival_guest skills: [moving, fipa]{
+
+
+//Personality traits
+	int rich <- rnd(0,5);
+	int friendly <- rnd(0,5);
+	int generous <- rnd(0,5);
+	
+	/* Variables */
+	string type <- festival_guest_type[rnd(0, length(festival_guest_type)-1)];
+	string drink; // It is initialized randomly in the init statement in global
+	
+	/* Thresholds for behaviour. */
+	bool initialized <- false;
+	//int thirsty_level <- rnd(600,800);
+	//bool isThirsty <- false;
+	int party_desire;
+	bool buy_drinks_desire;
+	int dance_desire;
+	bool dance_with_strangers_desire;
+	bool wantsParty <- false;
+	bool shop_for_stranger_desire;
+	bool wantsShoppingPartner <- true;
+	bool shop_desire;
+	bool crime_desire;
+
+	/* Booleans for attending Bar or Stage/Concert. */
+	//bool isAtBar <- false;
+	//bool isAtStage <- false;
+
+	point target;
+	point target_point;
+	int timer <- 0 update: timer + 1;
+	bool indicator;
+	bool dance_indicator;
+	int i <-0;
+	bool new <- false;
+	
+
+aspect default{
+		if self.type = "Party"{
+			draw triangle(1) at: self.location color: #red lighted: bool(1);
+			self.party_desire <- rnd(80,100);  //Defining party desire
+			self.dance_desire <- rnd(80,100);  //Defining dance desire
+		}
+		else if self.type = "Chill"{
+			draw triangle(1) at: self.location color: #pink lighted: bool(1);
+			self.party_desire <- rnd(20,80);    //Defining party desire
+			self.dance_desire <- rnd(50,100);  //Defining dance desire
+		}
+		else if self.type = "Shopaholic"{
+			draw triangle(1) at: self.location color: #orange lighted: bool(1);
+			self.party_desire <- rnd(20,50);  //Defining party desire
+			self.dance_desire <- rnd(0,10);  //Defining dance desire
+		}
+		else if self.type = "Criminal"{
+			draw triangle(1) at: self.location color: #black lighted: bool(1);
+			self.party_desire <- rnd(10,100);    //Defining party desire
+			self.dance_desire <- rnd(0,5);  //Defining dance desire
+		}
+		else if self.type = "Introvert"{
+			draw triangle(1) at: self.location color: #green lighted: bool(1);
+			self.party_desire <- 0;     //Defining party desire
+			self.dance_desire <- 0;  //Defining dance desire
+		}
+	}
+
+
+reflex roam when: self.timer<50{
+	do wander;
+}
+
+
+//Randomized places for each type of guest
+reflex select_location when: new=true{
+		if self.type = "Party" {
+			self.target <- areas_location[rnd(0, length(areas_location)-1)].location;
+			write self.name + " : I am a party person. I desire and intend to be at the bar!";
+			n_party <- n_party + 1;
+			}
+		else if self.type ="Chill" {
+			self.target <- areas_location[rnd(0, length(areas_location)-1)].location;
+			write self.name + " : I am a chill person. I desire and intend to be at the stage!";
+			n_chill <- n_chill + 1;
+		}
+		else if self.type = "Shopaholic" {
+			self.target <- areas_location[rnd(0, length(areas_location)-1)].location;
+			write self.name + " : I am a shopaholic. I desire and intend to be at the shop!";
+			n_shopaholic <- n_shopaholic + 1;	
+		}
+		else if self.type = "Criminal" {
+			self.target <- areas_location[rnd(0, length(areas_location)-1)].location;
+			write self.name + " : I am a criminal. I desire and intend to disturb people everywhere!";
+			n_criminal <- n_criminal + 1;
+		}
+		else if self.type = "Introvert" {
+			self.target <- areas_location[rnd(0, length(areas_location)-1)].location;
+			write self.name + " : I am an introvert. I desire and intend to roam alone everywhere!";
+			n_introvert <- n_introvert + 1;
+		}
+	}
+	
+reflex move when: self.target != nil {
+		if (distance_to(self.location, self.target) > 1#m) {
+			do goto target: self.target speed: 10.0;
+		}
+		else {
+			do wander;
+	}
+}
+
+reflex change_location{
+	if new = true {
+		write "Time to change locations for new interactions";
+		new <- false;
+		}
+	else if new = false{
+		if i <= 50
+			{
+				i <- i+1;
+			}
+				
+			else {
+				new <- true;
+				i <- 0;
+			}
+		}
+	}
+
+
+reflex guest_interactions when: self.timer>100{
+	ask Festival_guest at_distance 2#m {
+		
+		//Interactions for Party people
+			if (myself.type = "Party" and myself.rich>=3 and myself.generous>=3){
+				//Desire to buy drinks becomes the intention
+				buy_drinks_desire <- true;
+				write string (myself.name) + ": I have an intention to buy someone drinks!";
+				write string(myself.name) + "asks: Hej " + string(self.name) + ". I'm a " + string(myself.type) + " person and I want to order you drinks!";
+				if self.friendly>=3 {
+					indicator <- flip(self.party_desire);
+					if indicator=true {
+						global_happiness <- global_happiness + 1;
+						if (distance_to(self.location, bar_location) > 1#m) {
+							do goto target: bar_location speed: 10.0;
+							}
+						else {
+							do wander;
+						}
+						
+						write string(self.name) + "says: Yes, " + string(myself.name) + ". I am " + string(self.type) + "person. You can buy me a drink";
+					} else if indicator=false {
+						global_sadness <- global_sadness + 1;
+						
+						write string(self.name) + 'says: No, ' + string(myself.name) + ". I am " + string(self.type) + " and I do not like " + string(myself.type) + ' people.';
+					}
+				} 
+				else if self.friendly<3 {
+					bool indicator_1 <- flip(self.friendly/10);
+					bool indicator_2 <- flip(self.party_desire);
+					if indicator_1 and indicator_2 {
+						indicator <- true;
+						global_happiness <- global_happiness + 1;
+						if (distance_to(self.location, bar_location) > 1#m) {
+							do goto target: bar_location speed: 10.0;
+							}
+						else {
+							do wander;
+						}
+						
+						write string(self.name) + 'says: Yes, ' + string(myself.name) + '. I am ' + string(self.type) + " person and would love it.";
+				} 
+				else {
+						indicator <- false;
+						global_sadness <- global_sadness + 1;
+						
+						write string(self.name) + "says: No, thank you " + string(myself.name) + ". I don't like to be friendly!";
+					}
+				}
+			}
+			
+			
+			
+			//Interactions for Chill people
+			else if (myself.type = "Chill" and myself.friendly>=3){
+				//Desire to buy drinks becomes the intention
+				dance_with_strangers_desire <- true;
+				write "I have an intention to dance with strangers!";
+				write string(myself.name) + "asks: Hej " + string(self.name) + ". I'm a " + string(myself.type) + " person and I want to dance with you!";
+				if (self.friendly>=3 and self.type != "Introvert") {
+					dance_indicator <- flip(self.dance_desire);
+					if indicator=true {
+						global_happiness <- global_happiness + 1;
+						if (distance_to(self.location, stage_location) > 1#m) {
+							do goto target: stage_location speed: 10.0;
+							}
+						else {
+							do wander;
+						}
+						
+						write string(self.name) + "says: Sure, " + string(myself.name) + ". I would love to dance with you!";
+					} 
+					else if dance_indicator=false {
+						global_sadness <- global_sadness + 1;
+						write string(self.name) + 'says: No, ' + string(myself.name) + ". I do not like " + string(myself.type) + " people.";
+					}
+				} 
+				else if (self.friendly<3 and self.type!= "Introvert")  {
+					bool dance_indicator_1 <- flip(self.friendly/10);
+					bool dance_indicator_2 <- flip(self.dance_desire);
+					if dance_indicator_1 and dance_indicator_2 {
+						dance_indicator <- true;
+						global_happiness <- global_happiness + 1;
+						if (distance_to(self.location, stage_location) > 1#m) {
+							do goto target: stage_location speed: 10.0;
+							}
+						else {
+							do wander;
+						}
+						
+						write string(self.name) + " : Yes, " + string(myself.name) + ". I am " + string(self.type) + " person and I would love to dance with you.";
+				}
+				else {
+						dance_indicator <- false;
+						global_sadness <- global_sadness + 1;
+						write string(self.name) + "says: No, thank you " + string(myself.name) + ". I don't like to dance!";
+					}
+				}
+				
+				else if self.type= "Introvert" {
+					global_sadness <- global_sadness + 1;
+					write string(self.name) + 'says: No, ' + string(myself.name) + ". I am " + string(self.type) + " and I do not like to dance with people.";
+					}
+				}
+			
+			
+			
+			//Interactions for Shopaholics	
+			else if (myself.type = "Shopaholic" and myself.rich>=3 and myself.generous>=3 and myself.friendly>=3){
+				//Desire to shop becomes the intention
+				wantsShoppingPartner <- true;
+				shop_desire <- true;
+				write string (myself.name) + ": I need a shopping partner! I am rich and generous and will buy some clothes for my shopping partner";
+				write string(myself.name) + "asks: Hej " + string(self.name) + ". I'm a " + string(myself.type) + " person and I need a partner to accompany me while shopping";
+				if (self.type = "Criminal" and self.friendly < 2) {
+					global_sadness <- global_sadness + 2;
+					
+					//Committing a crime becomes the intention of the criminal
+					bool commit_crime <- true; //Intention to commit crime
+					if (distance_to(self.location, shop_location) > 1#m) {
+							do goto target: shop_location speed: 10.0;
+							}
+					else {
+							do wander;
+						}
+					
+					write string(self.name) + ": Sure, I would be your shopping partner. I am a criminal and I am going to make you buy stuff for me! Let's go to the store";
+				}
+				else if (self.type != "Criminal" and self.friendly >= 3) {
+					write string(self.name) + ": Sure, I would love to be your shopping partner! I am friendly. Let's go to the shop";
+					if (distance_to(self.location, shop_location) > 1#m) {
+							do goto target: shop_location speed: 10.0;
+							}
+					else {
+							do wander;
+						}
+					
+					global_happiness <- global_happiness + 5;
+					
+				}
+				else if ((self.type != "Criminal" and self.friendly < 3) or (self.type = "Introvert")){
+					write string(self.name) + ": I do not want to join you!";
+					global_sadness <- global_sadness + 1;
+					
+				}
+			}
+			
+			
+			
+			//Interactions for Criminals
+			else if (myself.type = "Criminal" and myself.friendly <3) {
+				//Desire to commit crime becomes the intention
+				crime_desire <- true;
+				write string (myself.name) + ": I am a criminal and I will mess with people now!";
+				write string(myself.name) + "asks: Hej " + string(self.name) + ". I'm a " + string(myself.type) + " and I have a gun! Give me all your money!";
+				if self.type = "Criminal" {
+					global_sadness <- global_sadness + 1;
+					
+					//Committing a crime becomes the intention of the criminal
+					bool commit_crime <- true; //Intention to commit crime
+					write string(self.name) + ": I am a criminal too! Let us join hands and steal from other people";
+				}
+				
+				else if self.type != "Criminal" {
+					global_sadness <- global_sadness + 1;
+					
+					//Committing a crime becomes the intention of the criminal
+					bool commit_crime <- true; //Intention to commit crime
+					write string(self.name) + ": I am scared. Please don't kill me!";
+				}
+			}
+			
+			else if (myself.type = "Criminal" and myself.friendly >=3) {
+				//Desire to commit crime does not become intention
+				crime_desire <- false;
+				write string (myself.name) + ": I am a criminal but I will not annoy people!";
+				write string(myself.name) + "asks: Hej " + string(self.name) + ". I'm a " + string(myself.type) + " but I am friendly, so I will not hurt you! Let's hang out";
+				if (self.type = "Criminal" and self.friendly >=3) {
+					global_happiness <- global_happiness + 5;
+					write "The world just became a better place and happiness level went up by 5!";
+					//Committing a crime becomes the intention of the criminal
+					bool commit_crime <- false; //Intention to commit crime
+					write string(self.name) + ": I am a criminal too but I am friendly. we will not disturb people. Let's hang out together";
+				}
+				else if (self.type != "Criminal" and self.friendly >=3) {
+					global_happiness <- global_happiness + 2;
+					write "Sure, I will hang out with you!";
+				}
+			}
+		
+		
+		// Interactions for Introverts
+		else if (myself.type = "Introvert" and myself.friendly < 2) {
+				//No desire to interact. They just want to roam around. So, they will not start any conversations
+				write string(myself.name) + "says: I'm a " + string(myself.type) + " and I am very shy! I just want to roam around. Don't disturb me!";
+				if (self.type = "Criminal" and self.friendly < 3) {
+					global_sadness <- global_sadness + 1;
+					
+					write string(self.name) + ": I am an unfriendly criminal and I will follow you around and disturb you!";
+				}
+				else if (self.type != "Criminal" and self.friendly>= 3) {
+					write string(self.name) + ": Okay, no problem. I will leave you alone!";
+				}
+				else if (self.type != "Criminal" and self.friendly< 3) {
+					write string(self.name) + ": That was rude of you. I want to talk to you!";
+					global_sadness <- global_sadness + 1;
+					
+				}
+			}
+			
+			
+		}
+	}
+}
+
+
+
+experiment main type: gui {
+	output{
+		display Newfinalproject type: opengl {
+			species Bar;
+			species Stage;
+			species Entrance;
+			species Shop;
+			species Festival_guest;
+			}
+		
+		display chart 
+		{
+			chart "Happiness and sadness levels"
+			{
+				data "Global happiness" value: global_happiness color: #green;
+				data "Global sadness" value: global_sadness color: #red;
+			}
+		}
+		
+		display "Agents" refresh: every(50#cycles) {
+        chart "Type of agents" type: pie {
+        data "Party" value: n_party  color: #red;
+        data "Chill" value: n_chill  color: #pink;
+        data "Shopaholic" value: n_shopaholic  color: #blue;
+        data "Criminal" value: n_criminal  color: #green;
+        data "Introvert" value: n_introvert  color: #yellow;
+		}
+	}
+}
+}
