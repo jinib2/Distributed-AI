@@ -1,0 +1,681 @@
+/**
+* Name: Model
+* Based on the internal empty template. 
+* Author: Admin
+* Tags: 
+*/
+
+
+model Festival
+
+/* Insert your model definition here */
+
+global
+{
+	int no_guests <- 4;
+	int no_guests_mem <- 7; 
+	int no_bad_guests <- 2;
+	int distance_travelled <- 0;
+	int guest_speed <- 2;
+	int bad_speed <- 3;
+	int guard_speed <- 5;
+	int thirsty <- rnd(10, 10);
+	int hungry <- rnd(10, 10);
+	
+	point bad_guest_loc;
+	bool bad_guest <- false;
+	int tolerance <- 100;
+	bool security_alert <- false;
+	
+	int displacement <- 0;
+	int displacement_mem <- 0;
+	
+	init{
+		create entrance number: 1
+		{
+			location <- {1,50};
+		}
+		
+		create information_center number: 1
+		{
+			location <- {20,40};
+		}
+			
+		create water_station number: 1
+		{
+			location <- {50,40};
+		}
+		
+		create food_truck number: 1
+		{
+			location <- {35,10};
+		}
+		
+		create vegan_restaurant number: 1
+		{
+			location <- {10, 15};
+		}
+		
+		create cafe number: 1
+		{
+			location <- {60,30};
+		}
+		
+		create security_guard number: 1
+		{
+			location <- {60,60};
+			targetpoint <- {rnd(100), rnd(100)};
+			security_alert <- false;
+		}
+		
+		create festival_guest number: no_guests
+		{
+			location <- {rnd(100), rnd(100)};
+			targetpoint <- {rnd(100), rnd(100)};
+			knowledge <- false;
+			wait <- 20;
+		}
+		
+		create baddy_guest number: no_bad_guests
+		{
+			location <- {rnd(10), rnd(100)};
+			targetpoint <- {rnd(100), rnd (100)};
+			wait <- 15;
+		}
+		
+		create guest_mem number: no_guests_mem
+		{
+			location <- {rnd(100), rnd(100)};
+			targetpoint <- {rnd(100), rnd(100)};
+			wait <- 20;
+			knowledge_drink <- false;
+			knowledge_food <- false;
+		}
+	}
+}
+
+
+species entrance{
+	aspect default{
+		draw box (2,15,2) at: location color: #orange lighted: bool(1);
+	}
+}
+
+species information_center{
+	aspect default{
+		draw box(10,10,10) at: location color: #blue lighted: bool(1);
+	}
+}
+
+species water_station{
+	aspect default{
+		draw box(5,5,2) at: location color: #cyan lighted: bool(1);
+	}
+}
+
+species food_truck{
+	aspect default{
+		draw box(10,5,2) at: location color: #red lighted: bool(1);
+	}
+}
+
+species vegan_restaurant{
+	aspect default{
+		draw box(10,5,2) at: location color: #green lighted: bool(1);
+	}
+}
+
+species cafe{
+	aspect default{
+		draw box(10,7,5) at: location color: #yellow lighted: bool(1);
+	}
+}
+
+species festival_guest skills: [moving]{
+	aspect default {
+		draw box(1,1,1) color: color lighted: bool(1);
+	}
+	
+	rgb color <- #black;
+	
+	point targetpoint;
+	point water_location;
+	
+	int i <- rnd (1,3);
+	int wait;
+	
+	bool moving <- true;
+	bool isthirsty <- false;
+	bool ishungry <- false;
+	bool speak <- true;
+	bool chosen <- false;
+	bool knowledge <- false;
+	
+	int thirst_level <- rnd(100,200);
+	int hunger_level <- rnd(100,600);
+	
+	int thirst <- thirst_level;
+	int hunger <- hunger_level;
+	
+	int thirst_dec <- rnd(5,15);
+	int hunger_dec <- rnd(5,10);
+	
+	//point target <- information_center;
+	
+	/*reflex movearound when: (isthirsty and ishungry)
+	{
+		do goto target: targetpoint speed: guest_speed;
+		displacement <- displacement + 1;
+		if (location distance_to(targetpoint) < guest_speed)
+		{
+			targetpoint <- {rnd(100), rnd(100)};
+		}
+	}*/
+	
+	reflex reduce_level when: (!self.isthirsty and !self.ishungry) 
+	{
+		self.thirst_level <- self.thirst_level - self.thirst_dec;
+		self.hunger_level <- self.hunger_level - self.hunger_dec;
+		}
+	
+	reflex hungry_thirsty_alert
+	{
+		if (thirst_level < thirsty){
+			self.color <- #red;
+			self.isthirsty <- true;
+			if speak{
+				write self.name + " : I'm thirsty";
+				speak <- false;	
+			}
+			
+		}
+		
+		else if (hunger_level < hungry) {
+			self.color <- #blue;
+			self.ishungry <- true;
+			if speak {
+				write self.name + " : I'm hungry";
+				speak <- false;	
+			}
+		}
+		else {
+			do wander;
+			}
+	}
+	
+	reflex gotoinfo_center when: ((self.thirst_level < thirsty) or (self.hunger_level < hungry)) and !knowledge
+	{		
+		self.moving <- false;
+		
+		if self.isthirsty = true{
+			targetpoint <- {50,40};
+		}	
+		else if self.ishungry{
+			if i = 1{
+				targetpoint <- {35,10};  //foodtruck
+			}
+			else if i = 2{
+				targetpoint <- {10,15}; //vegan restaurant
+			}
+			else{
+				targetpoint <- {60,30}; //cafe
+			}
+		}
+		
+		do goto target: {20,40} speed: guest_speed; //go to information center for enquiring about location
+		
+		if (location != {20,40}){
+			displacement <- displacement + 1;
+		}
+		
+		if (location = {20,40}){
+			if wait <= 0 {
+				if (self.isthirsty){
+					write self.name + " : I know the location (DRINK)";
+					knowledge <- true;
+					wait <- 2;	
+				}
+				else if (self.ishungry){
+					write self.name + " : I know the location (FOOD)";
+					knowledge <- true;
+					wait <- 2;	
+				}
+			}
+			wait <- wait - 1;
+		}
+	}
+	
+	reflex frominfocenter when: knowledge{
+		if (self.isthirsty){
+			self.water_location <- {50,40};
+			targetpoint <- self.water_location;
+			
+			do goto target: targetpoint speed: guest_speed;
+			
+			if (location != targetpoint){
+				displacement <- displacement + 1;
+				}
+			
+			if (location = targetpoint){
+				if wait <= 0{
+					write self.name + " : Feeling great now!";
+					self.color <- #black;
+					knowledge <- false;
+					speak <- true;
+					thirst_level <- rnd (100,200);
+					self.isthirsty <- false;
+					wait <- 3;
+				}
+				wait <- wait - 1;
+			}
+		} 
+		else if (self.ishungry){
+			if !chosen{
+				i <- rnd(1,4);
+				if i = 1{
+					targetpoint <- {35,10};  //foodtruck
+					chosen <- true;
+				}
+				else if i = 2{
+					targetpoint <- {10,15}; //vegan restaurant
+					chosen <- true;
+				}
+				else{
+					targetpoint <- {60,30}; //cafe
+					chosen <- true;
+				}	
+			}
+			else if chosen{
+				do goto target: targetpoint speed: guest_speed;
+				
+				if(location != targetpoint){
+					displacement <- displacement +1;
+				}
+				
+				if (location = targetpoint){
+					if (wait <= 0) {
+						write self.name + " : Feeling great now!";
+						self.color <- #black;
+						speak <- true;
+						knowledge <- false;
+						hunger_level <- rnd (100,200);
+						self.ishungry <- false;
+						self.chosen <- false;
+						wait <- 2;
+					}
+					wait <- wait - 1;
+				}	
+			}
+		} 
+		else{
+			//do goto target: {rnd(100), rnd(100)} speed: guest_speed;
+			do wander;
+			displacement <- displacement + 1;
+		}
+  	}
+}
+
+species guest_mem skills: [moving]{
+	aspect default {
+		draw sphere(1) color: color lighted: bool(1);
+	}
+	 
+	rgb color <- #grey ;
+	
+	point targetpoint;
+	point water_location;
+	point bad_guest_loc;
+	
+	baddy_guest baddy;
+	
+	int i <- rnd (1,3);
+	int wait;
+	
+	bool moving <- true;
+	bool isthirsty <- false;
+	bool ishungry <- false;
+	bool knowledge_drink <- false;
+	bool knowledge_food <- false;
+	bool speak <- true;
+	bool chosen <- false;
+	bool report <- false;
+	
+	int thirst_level <- rnd(100,200);
+	int hunger_level <- rnd(300,400);
+	
+	int thirst <- thirst_level;
+	int hunger <- hunger_level;
+	
+	int thirst_dec <- rnd(1,10);
+	int hunger_dec <- rnd(1,5);
+	
+	//point target <- information_center;
+	
+	/*reflex movearound when: (isthirsty and ishungry)
+	{
+		do goto target: targetpoint speed: guest_speed;
+		displacement <- displacement + 1;
+		if (location distance_to(targetpoint) < guest_speed)
+		{
+			targetpoint <- {rnd(100), rnd(100)};
+		}
+	}*/
+	
+	reflex reduce_level when: (!self.isthirsty and !self.ishungry) and !report
+	{
+		self.thirst_level <- self.thirst_level - self.thirst_dec;
+		self.hunger_level <- self.hunger_level - self.hunger_dec;
+		}
+	
+	reflex hungry_thirsty_alert
+	{
+		if (thirst_level < thirsty){
+			self.color <- #red;
+			self.isthirsty <- true;
+			if speak{
+				write self.name + " : I'm thirsty";
+				speak <- false;	
+			}
+			
+		}
+		
+		else if (hunger_level < hungry) {
+			self.color <- #blue;
+			self.ishungry <- true;
+			if speak {
+				write self.name + " : I'm hungry";
+				speak <- false;	
+			}
+		}
+		else {
+			do wander;
+		}
+	}
+	
+	reflex gotoinfo_center when: ((self.thirst_level < thirsty and !self.knowledge_drink) 
+							   or (self.hunger_level < hungry and !self.knowledge_food)) and !report
+	{		
+		self.moving <- false;
+		
+		if self.isthirsty = true{
+			targetpoint <- {50,40};
+		}	
+		else if self.ishungry{
+			if i = 1{
+				targetpoint <- {35,10};  //foodtruck
+			}
+			else if i = 2{
+				targetpoint <- {10,15}; //vegan restaurant
+			}
+			else{
+				targetpoint <- {60,30}; //cafe
+			}
+		}
+		
+		do goto target: {20,40} speed: guest_speed; //go to information center for enquiring about location
+		
+		if (location != {20,40}){
+			displacement_mem <- displacement_mem + 1;
+		}
+		
+		if (location = {20,40}){
+			if wait <= 0 {
+				if (self.isthirsty and !self.knowledge_drink){
+					write self.name + " : I know the location (DRINK)";
+					knowledge_drink <- true;
+					wait <- 2;	
+				}
+				else if (self.ishungry and !self.knowledge_food){
+					write self.name + " : I know the location (FOOD)";
+					knowledge_food <- true;
+					wait <- 2;	
+				}
+			}
+			wait <- wait - 1;
+		}
+	}
+	
+	reflex frominfocenter when: (knowledge_drink or knowledge_food) and !report{
+		if (self.isthirsty and self.knowledge_drink){
+			self.water_location <- {50,40};
+			targetpoint <- self.water_location;
+			
+			do goto target: targetpoint speed: guest_speed;
+			
+			if (location != targetpoint){
+				displacement_mem <- displacement_mem + 1;
+				}
+			
+			if (location = targetpoint){
+				if wait <= 0{
+					write self.name + " : Feeling great now!";
+					self.color <- #grey;
+					speak <- true;
+					thirst_level <- rnd (100,200);
+					self.isthirsty <- false;
+					wait <- 3;
+				}
+				wait <- wait - 1;
+			}
+		} 
+		else if (self.ishungry and self.knowledge_food){
+			if !chosen{
+				i <- rnd(1,4);
+				if i = 1{
+					targetpoint <- {35,10};  //foodtruck
+					chosen <- true;
+				}
+				else if i = 2{
+					targetpoint <- {10,15}; //vegan restaurant
+					chosen <- true;
+				}
+				else{
+					targetpoint <- {60,30}; //cafe
+					chosen <- true;
+				}	
+			}
+			else if chosen{
+				do goto target: targetpoint speed: guest_speed;
+				
+				if(location != targetpoint){
+					displacement_mem <- displacement_mem +1;
+				}
+				
+				if (location = targetpoint){
+					if (wait <= 0) {
+						write self.name + " : Feeling great now!";
+						self.color <- #grey;
+						speak <- true;
+						hunger_level <- rnd (100,200);
+						self.ishungry <- false;
+						self.chosen <- false;
+						wait <- 2;
+					}
+					wait <- wait - 1;
+				}	
+			}
+		} 
+		else{
+			//do goto target: {rnd(100), rnd(100)} speed: guest_speed;
+			do wander;
+			displacement_mem <- displacement_mem + 1;
+		}
+  	}
+  	
+  	reflex bad_alert when: bad_guest{
+  		ask(baddy_guest){
+  			if (myself.location distance_to(self.location) < 2){
+  				write "I have found a Bad guy.";
+  				myself.baddy <- self;
+  				myself.report <- true;
+  			}
+  		}
+  	}
+  	
+  	reflex report when: self.report and bad_guest{
+  		point guard_position;
+  		self.color <- #green;
+  		
+  		ask(security_guard){
+  			guard_position <- self.location;
+  		}
+  		
+  		do goto target: guard_position speed: guest_speed;
+  		
+  		if(self.location = guard_position){
+  			ask(security_guard){
+  				if( !(myself.baddy in self.targets) ) {
+  					add myself.baddy to: self.targets;
+  					write "Guard Informed";
+  					security_alert <- true;
+  					myself.report <- false;
+  				} 
+  				else {
+  					write "Already informed.";
+  					myself.report <- false;
+  				}
+  			}
+  			report <- false;
+  		}
+  	}
+}
+
+species baddy_guest skills: [moving]{
+	aspect default {
+		draw sphere(1) color: color lighted: bool(1);
+	}
+	
+	rgb color <- #purple;
+	point targetpoint;
+	int wait;
+	
+	//bool isthirsty <- false;
+	//bool ishungry <- false;
+	//bool knowledge;
+	bool active <- false;
+	bool speak <- true;
+	bool chosen <- false;
+	
+	int thirst_level <- rnd(100,200);
+	int hunger_level <- rnd(100,200);
+	
+	int bad_level <- 0;
+	int mess <- rnd(1,5);
+	
+	int thirst <- thirst_level;
+	int hunger <- hunger_level;
+	
+	int thirst_dec <- rnd(5,10);
+	int hunger_dec <- rnd(10,10);
+	
+	
+	/*reflex move when: isthirsty= false and ishungry = false{
+		//self.thirst_level <- self.thirst_level - self.thirst_dec;
+		//self.hunger_level <- self.hunger_level - self.hunger_dec;
+		self.bad_level <- self.bad_level + 2.0;
+		do wander speed: 2.0;
+	}*/
+	
+	reflex move when: !active{
+		//self.thirst_level <- self.thirst_level - self.thirst_dec;
+		//self.hunger_level <- self.hunger_level - self.hunger_dec;
+		self.bad_level <- self.bad_level + self.mess;
+		do wander speed: guest_speed;
+	}
+
+	reflex bad_begin when: (self.bad_level > tolerance) and !active and !bad_guest{
+		bad_guest <- true;
+		active <- true;
+		self.color <- #yellow;
+		write self.name + " : I am bad !!!";
+		//bad_guest_loc <- self.location;
+	}
+	
+	reflex messing when: active{
+		if !chosen{
+			int i <- rnd(1,10);
+			switch i {	
+				match 1 { targetpoint <- {35,10}; chosen <- true;}  //foodtruck 			
+				match 2 { targetpoint <- {10,15}; chosen <- true;} //vegan restaurant 
+				match 3 { targetpoint <- {60,30}; chosen <- true;}  //cafe 			
+				match 4 { targetpoint <- {50,40}; chosen <- true;} //water 
+				default { do wander speed: bad_speed;}
+			}	
+		}
+		else if chosen {
+			do goto target:targetpoint speed: bad_speed;
+			if (self.location = targetpoint){
+				chosen <- false;
+			}
+		}
+	}
+			
+}
+
+species security_guard skills: [moving] {
+	rgb color <- #black;
+	point targetpoint;
+	
+	aspect default{
+		draw cylinder(2,2) at: location color: color;
+	}
+	
+	list<baddy_guest> targets <- [];
+
+	reflex take_out when: security_alert{
+		
+		if (self.targets != []){	
+			point target <- self.targets[0].location;
+			do goto target: target speed: 5.0;
+			if (self.location distance_to(target) < 2){
+				ask (baddy_guest){
+					if (length(myself.targets) > 0 and self = myself.targets[0]){
+						write "Removed";
+						write "Total Distance: " + distance_travelled;
+						remove first(myself.targets) from: myself.targets;
+						do die;
+					}
+				}
+			}
+		}
+		else {
+			ask(guest_mem){
+				self.report <- false;
+			}
+			bad_guest <- false;
+			security_alert <- false;
+			write "Baddy guest already addressed.";
+		}
+	}
+	
+	reflex at_base when: security_alert = false{
+		do goto target: {80,80} speed: 5.0;
+	}
+}
+
+experiment main type: gui{
+	output {
+		display map type: opengl
+		{
+			species entrance;
+			species information_center;
+			species water_station;
+			species food_truck;
+			species vegan_restaurant;
+			species cafe;
+			species festival_guest;
+			species security_guard;
+			species baddy_guest;
+			species guest_mem;
+		}
+		
+		display chart
+		{
+			chart "Agent displacements with and without memory"
+			{
+				data "Distance for agents with memory" value: displacement_mem color: #pink;
+				data "Distance for agents without memory" value: displacement color: #red;
+			}
+		}
+	}
+}
